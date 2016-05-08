@@ -1,0 +1,9 @@
+{
+    "gcloud": {
+        "projectId": "ase16-1255"
+    },
+
+    "log": {
+        "level": "info"
+    }
+}
