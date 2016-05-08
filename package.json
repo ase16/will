@@ -1,0 +1,21 @@
+{
+  "name": "will",
+  "description": "sentiment analysis of tweets",
+  "version": "1.0.0",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ase16/will.git"
+  },
+  "author": "Oliver Leumann, Andreas Albrecht, Roy Rutishauser, Shanmathuran Sritharan",
+  "license": "MIT",
+  "dependencies": {
+    "config": "^1.19.0",
+    "winston": "^2.2.0",
+    "gcloud": "^0.32.0",
+    "sentiment": "^1.0.6"
+  }
+}
