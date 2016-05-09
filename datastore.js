@@ -20,53 +20,17 @@ const db = {
         callback();
     },
 
-    // @param callback fn(err, res)
-    // --> res is an array containing terms e.g. ['jay-z', 'google', 'solarpower']
-    getAllTerms: function(callback) {
-        if (!isConnected()) {
-            return callback("Not connected", []);
-        }
-
-        var keywords = [];
-        var query = datastore.createQuery('Term');				// --> https://googlecloudplatform.github.io/gcloud-node/#/docs/v0.32.0/datastore?method=createQuery
-        datastore.runQuery(query, function(err, entities) {		// --> https://googlecloudplatform.github.io/gcloud-node/#/docs/v0.32.0/datastore?method=runQuery
-            if (err) {
-                log.error("datastore.readTerms error: Error = ", err);
-                return callback(err, null);
-            }
-
-            entities.forEach(function(e) {
-                keywords.push(e.key.name);
-            });
-            callback(null, keywords);
-        });
-    },
-
     // Add a new tweet.
     // @param tweet JSON as received from the Twitter API
     // @param callback fn(err, res)
-    insertTweet: function(tweet, callback) {
+    getTweet: function(callback) {
         if (!isConnected()) {
             callback("Not connected", null);
             return;
         }
 
-        var tweetKey = datastore.key('Tweet');
-        datastore.save({
-                key: tweetKey,
-                data: {
-                    id_str: tweet['id_str'],
-                    created_at: tweet['created_at'],
-                    inProgress: false,
-                    tweet: tweet['text']
-                }
-        }, function(err) {
-            if (err) {
-                callback(err);
-                return;
-            }
-            callback(null, tweetKey);
-        });
+        var query = datastore.createQuery('Tweet').autoPaginate(false).limit(2000);
+        datastore.runQuery(query, callback);
     }
 };
 

@@ -8,7 +8,7 @@ const tweetanalyzer = require('./tweetanalyzer.js');
 
 log.info('TweetAnalyzer initializing...');
 db.connect(config.get('gcloud'), function() {
-  tweetanalyzer.init(db, function(err, res) {
-    log.info('TweetAnalyzer is ready.');
-  });
+    tweetanalyzer.init(db, function() {
+        log.info('TweetAnalyzer is ready.');
+    });
 });
