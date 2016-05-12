@@ -7,6 +7,8 @@ const config = require('config');
 const log = require('winston');
 log.level = config.get('log.level');
 
+const os = require('os');
+
 let db;
 
 // #tweets and ts when last updated.
@@ -40,7 +42,8 @@ function extractWords(text) {
 
 
 function analyzeTweet() {
-    db.getTweet(function (err, tweets) {
+    var nodeId = os.hostname();
+    db.getTweets(nodeId, function (err, tweets) {
         if (err) {
            log.warn(err);
            return nextTweet();
@@ -56,23 +59,21 @@ function analyzeTweet() {
 
         tweets.forEach(function(t) {
             var tweet = t.data;
-            log.debug('Got new tweet: %s\t[%s]', t['id_str'], t['tweet']);
+            log.debug('Got new tweet: %s\t[%s]', tweet['id_str'], tweet['tweet']);
             var text = tweet['tweet'];
             var words = extractWords(text);
             var sentimentResult = sentimentAnalysis(text);
+            tweet.sentiment = sentimentResult;
+            tweet.words = words;
             stats.tweetsCount += 1;
-
-            /*db.updateSingleTweetWithAnalysis(res.value['_id'], words, sentimentResult, function(err, res) {
-                if (err) {
-                    log.error('Could not update tweet', err);
-                } else {
-                    log.debug('Tweet analyzed.');
-                }
-                nextTweet();
-            });
-            */
-
         });
+
+        db.updateTweets(tweets, function(err) {
+            if (err) {
+                log.error("Could not update tweets.", err);
+            }
+        });
+
         nextTweet();
     });
 }

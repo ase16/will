@@ -23,14 +23,21 @@ const db = {
     // Add a new tweet.
     // @param tweet JSON as received from the Twitter API
     // @param callback fn(err, res)
-    getTweet: function(callback) {
+    getTweets: function(nodeId, callback) {
         if (!isConnected()) {
             callback("Not connected", null);
             return;
         }
-
-        var query = datastore.createQuery('Tweet').autoPaginate(false).limit(2000);
+        var query = datastore
+            .createQuery('Tweet')
+            .autoPaginate(false)
+            .filter('vm', '=', nodeId)
+            .limit(500);
         datastore.runQuery(query, callback);
+    },
+
+    updateTweets: function(tweets, callback) {
+        datastore.update(tweets, callback);
     }
 };
 
