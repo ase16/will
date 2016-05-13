@@ -20,24 +20,57 @@ const db = {
         callback();
     },
 
-    // Add a new tweet.
-    // @param tweet JSON as received from the Twitter API
-    // @param callback fn(err, res)
     getTweets: function(nodeId, callback) {
         if (!isConnected()) {
-            callback("Not connected", null);
-            return;
+            return callback("Not connected", null);
         }
         var query = datastore
             .createQuery('Tweet')
             .autoPaginate(false)
-            .filter('vm', '=', nodeId)
+            //.filter('vm', '=', nodeId)
             .limit(500);
         datastore.runQuery(query, callback);
     },
 
     updateTweets: function(tweets, callback) {
         datastore.update(tweets, callback);
+    },
+
+    deleteTweets: function(tweets, callback) {
+        if (!isConnected()) {
+            return callback("Not connected", null);
+        }
+        
+        var keys = [];
+        tweets.forEach(function(t) {
+            keys.push(t.key);
+        });
+        datastore.delete(keys, callback);
+    },
+
+    createKeyForTerm: function (term) {
+        return datastore.key(['sentiment_' + term]);
+    },
+
+    upsertAggregatedSentiment: function(sentiments, callback) {
+        if (!isConnected()) {
+            return callback("Not connected.");
+        }
+
+        for (var term in sentiments) {
+            if (sentiments.hasOwnProperty(term)) {
+                for (var date in sentiments[term]) {
+                    if (sentiments[term].hasOwnProperty(date)) {
+                        datastore.upsert(sentiments[term][date], function(err) {
+                            if (err) {
+                                log.error("Could not save sentiment");
+                            }
+                        });
+                    }
+                }
+            }
+        }
+        callback(null);
     }
 };
 
