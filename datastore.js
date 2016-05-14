@@ -49,9 +49,19 @@ const db = {
         var query = datastore
             .createQuery('Tweet')
             .autoPaginate(false)
-            //.filter('vm', '=', nodeId)
+            .filter('vm', '=', nodeId)
             .limit(500);
         datastore.runQuery(query, callback);
+    },
+
+    updateLoadOfVM: function(vmName, load, callback) {
+        var key = datastore.key(['VMLoad', vmName]);
+        datastore.upsert({
+            key: key,
+            data: {
+                load: load
+            }
+        }, callback);
     },
 
     updateTweets: function(tweets, callback) {

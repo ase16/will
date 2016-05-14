@@ -241,24 +241,30 @@ function processTweets() {
            return nextTweets();
         }
 
-        if (tweets.length === 0) {
-            // got no tweet to analyze - schedule next analysis in a few seconds.
-            // we back off a bit in order to not stress the database.
-            log.info('No more tweets. Schedule nextTweets in a few seconds');
-            setTimeout(nextTweets, 10*1000);
-            return;
-        }
-
-        tweets.forEach(function(t) {
-            analyzeTweet(t.data);
-            stats.tweetsCount += 1;
-        });
-
-        db.deleteTweets(tweets, function(err) {
+        db.updateLoadOfVM(nodeId, tweets.length, function(err) {
             if (err) {
-                log.error("Could not delete tweets: ", err);
+                log.error("Something went wrong with updateLoadOfVM. Err = ", err);
             }
-            nextTweets();
+
+            if (tweets.length === 0) {
+                // got no tweet to analyze - schedule next analysis in a few seconds.
+                // we back off a bit in order to not stress the database.
+                log.info('No more tweets. Schedule nextTweets in a few seconds');
+                setTimeout(nextTweets, 10*1000);
+                return;
+            }
+
+            tweets.forEach(function(t) {
+                analyzeTweet(t.data);
+                stats.tweetsCount += 1;
+            });
+
+            db.deleteTweets(tweets, function(err) {
+                if (err) {
+                    log.error("Could not delete tweets: ", err);
+                }
+                nextTweets();
+            });
         });
     });
 }
