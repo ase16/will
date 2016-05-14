@@ -13,6 +13,7 @@ log.level = config.get('log.level');
 const termToSentiment = {};
 
 let db;
+let allTerms = [];
 
 // #tweets and ts when last updated.
 const stats = {
@@ -204,6 +205,34 @@ function createEmptyAggregatedSentiment(term, date) {
     return sentiment;
 }
 
+function updateTerms(callback) {
+    db.getTerms(function(newTerms) {
+        allTerms = newTerms;
+        if (callback) {
+            callback(newTerms);
+        }
+    });
+}
+/**
+ * Intersection of words and terms, ignoring case.
+ * @param words - array of string tokens
+ * @returns {Array} - the terms that are present in words
+ */
+function extractTerms(words) {
+    words = words.map(function(s) { return s.toLowerCase().trim(); });
+    var terms = [];
+    // intersection of all terms and tokens of tweet
+    for (var i = 0; i < words.length; i++) {
+        for (var k = 0; k < allTerms.length; k++) {
+            if (words[i] === allTerms[k]) {
+                terms.push(allTerms[k]);
+                break;
+            }
+        }
+    }
+    return terms;
+}
+
 function processTweets() {
     var nodeId = os.hostname();
     db.getTweets(nodeId, function (err, tweets) {
@@ -239,28 +268,12 @@ function analyzeTweet(tweet) {
     log.debug('Got new tweet: %s\t[%s]', tweet['id_str'], text);
     var sentiment = sentimentAnalysis(text);
 
-    // TODO: should be the intersection of the tokens of the tweet and all terms in DB!
-    var allTerms = []; // TODO: get all terms from DB
-    var terms = [];
-    /*
-    // intersection of all terms and tokens of tweet
-    for (var i = 0; i < sentiment.tokens.length; i++) {
-        for (var k = 0; k < allTerms.length; k++) {
-            if (sentiment.tokens[i] == allTerms[k]) {
-                terms.push(i);
-                break;
-            }
-        }
-    }
-    */
-
-    terms = ['testterm']; // TODO: remove once code above works correctly.
-
     var dateTime = new Date(tweet['created_at']);
     var date = new Date(dateTime.getTime());
     date.setHours(0, 0, 0, 0);
     var hour = dateTime.getUTCHours().toString();
 
+    var terms = extractTerms(sentiment.tokens);
     terms.forEach(function(term) {
         var sentimentStats = getOrCreateAggregatedSentiment(term, date);
         sentimentStats.totalTweets += 1;
@@ -326,12 +339,20 @@ const tweetanalyzer = {
     init: function(dbModule, callback) {
         db = dbModule;
 
+        setInterval(updateTerms, 30*1000);
+
         setInterval(logStats, 10*1000);
 
-        setInterval(saveAggregatedSentiments, 10*1000);
+        setInterval(saveAggregatedSentiments, 30*1000);
 
         eventEmitter.on('nextTweets', processTweets);
-        nextTweets();
+
+        updateTerms(function(terms) {
+            log.debug("Terms: ", terms);
+            nextTweets();
+
+            callback();
+        });
     }
 };
 

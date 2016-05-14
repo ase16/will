@@ -20,6 +20,28 @@ const db = {
         callback();
     },
 
+    getTerms: function(callback) {
+        if (!isConnected()) {
+            return callback("Not connected", null);
+        }
+
+        var query = datastore
+            .createQuery('Term')
+            .select('__key__')
+            .autoPaginate(true);
+
+        var terms = [];
+        datastore.runQuery(query)
+            .on('error', log.error)
+            .on('data', function (entity) {
+                terms.push(entity.key.name.toLowerCase().trim());
+                // this.end(); // allows early termination
+            })
+            .on('end', function() {
+                    callback(terms);
+                });
+    },
+
     getTweets: function(nodeId, callback) {
         if (!isConnected()) {
             return callback("Not connected", null);
