@@ -11,16 +11,20 @@ log.level = config.get('log.level');
 
 
 let batchProcessing = config.get("batchProcessing");
+const LOG_STATS_INTERVAL = batchProcessing.logStatsInterval;
 const BACK_OFF_DURATION_WHEN_EMPTY = batchProcessing.backOffDurationWhenEmpty;
 const READ_TERMS_INTERVAL = batchProcessing.readTermsInterval;
 const SAVE_ANALYSIS_INTERVAL = batchProcessing.saveAnalysisInterval;
-let paused = batchProcessing.paused;
+const INITIALLY_PAUSED = batchProcessing.initiallyPaused;
 const BACK_OFF_DURATION_WHEN_PAUSED = batchProcessing.backOffDurationWhenPaused;
+const READ_PAUSED_STATE_INTERVAL = batchProcessing.readPausedStateInterval;
 
 // maps terms to aggregated sentiment
 const termToSentiment = {};
 
+let nodeId = os.hostname();
 let db;
+let paused = INITIALLY_PAUSED;
 let allTerms = [];
 
 // #tweets and ts when last updated.
@@ -242,8 +246,6 @@ function extractTerms(words) {
 }
 
 function processTweets() {
-    var nodeId = os.hostname();
-
     if (!paused) {
         db.getTweets(nodeId, function (err, tweets) {
             if (err) {
@@ -356,6 +358,21 @@ function saveAggregatedSentiments() {
     });
 }
 
+function readPausedState() {
+    db.getStateOfVM(nodeId, function(err, entity) {
+        if(!err) {
+            if (entity.data.hasOwnProperty("paused")) {
+                paused = entity.data.paused;
+            }
+            log.info("The VMs paused state is =", paused);
+        }
+        else {
+            log.error(err);
+        }
+        setTimeout(readPausedState, READ_PAUSED_STATE_INTERVAL * 1000);
+    });
+}
+
 function logStats() {
     var now = new Date().getTime();
     var timeSpan = now-stats.timestamp;
@@ -371,20 +388,26 @@ function logStats() {
 const tweetanalyzer = {
     init: function(dbModule, callback) {
         db = dbModule;
+        db.registerVM(nodeId, paused, function(err) {
+            if (!err) {
+                setInterval(updateTerms, READ_TERMS_INTERVAL * 1000);
+                setInterval(logStats, LOG_STATS_INTERVAL * 1000);
+                setInterval(saveAggregatedSentiments, SAVE_ANALYSIS_INTERVAL * 1000);
 
-        setInterval(updateTerms, READ_TERMS_INTERVAL * 1000);
+                // Only set time out here, since we reinitialize a new timeout every time after the update of the paused state
+                setTimeout(readPausedState, READ_PAUSED_STATE_INTERVAL * 1000);
 
-        setInterval(logStats, 10 * 1000);
+                eventEmitter.on('nextTweets', processTweets);
 
-        setInterval(saveAggregatedSentiments, SAVE_ANALYSIS_INTERVAL * 1000);
-
-        eventEmitter.on('nextTweets', processTweets);
-
-        updateTerms(function(terms) {
-            log.debug("Terms: ", terms);
-            nextTweets();
-
-            callback();
+                updateTerms(function(terms) {
+                    log.debug("Terms: ", terms);
+                    nextTweets();
+                    return callback();
+                });
+            }
+            else {
+                log.error(err);
+            }
         });
     }
 };
