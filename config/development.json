@@ -4,9 +4,11 @@
     },
 
     "batchProcessing": {
+        "paused": false,
+        "backOffDurationWhenPaused": 10,
         "readTermsInterval": 30,
         "saveAnalysisInterval": 30,
-        "backOfDurationWhenEmpty": 10
+        "backOffDurationWhenEmpty": 10
     },
 
     "log": {

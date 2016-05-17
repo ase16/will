@@ -11,9 +11,11 @@ log.level = config.get('log.level');
 
 
 let batchProcessing = config.get("batchProcessing");
-const BACK_OFF_DURATION_WHEN_EMPTY = batchProcessing.backOfDurationWhenEmpty;
+const BACK_OFF_DURATION_WHEN_EMPTY = batchProcessing.backOffDurationWhenEmpty;
 const READ_TERMS_INTERVAL = batchProcessing.readTermsInterval;
 const SAVE_ANALYSIS_INTERVAL = batchProcessing.saveAnalysisInterval;
+let paused = batchProcessing.paused;
+const BACK_OFF_DURATION_WHEN_PAUSED = batchProcessing.backOffDurationWhenPaused;
 
 // maps terms to aggregated sentiment
 const termToSentiment = {};
@@ -241,51 +243,57 @@ function extractTerms(words) {
 
 function processTweets() {
     var nodeId = os.hostname();
-    db.getTweets(nodeId, function (err, tweets) {
-        if (err) {
-           log.error("Could not retrieve tweets: ", err);
-           return nextTweets();
-        }
 
-        var batchSize = tweets.length;
-        db.updateLoadOfVM(nodeId, batchSize, function(err) {
-            if (!err) {
-                var now = new Date().getTime();
-                var newStat = {
-                    created: now,
-                    batchSize: batchSize
-                };
-                db.storeStat(newStat, function(err) {
-                    if (err) {
-                        log.error("Error during writing stats to datastore: err =", err);
-                    }
-                });
-            }
-            else {
-                log.error("Error, something went wrong with updateLoadOfVM: err =", err);
-            }
-        });
-
-        if (tweets.length === 0) {
-            // Got no tweet to analyze - schedule next analysis in a few seconds.
-            // We back off a bit in order to not stress the database.
-            log.info('No more tweets. Schedule nextTweets in a few seconds');
-            setTimeout(nextTweets, BACK_OFF_DURATION_WHEN_EMPTY * 1000);
-            return;
-        }
-
-        tweets.forEach(function(t) {
-            analyzeTweet(t.data);
-            stats.tweetsCount += 1;
-        });
-
-        db.deleteTweets(tweets, function(err) {
+    if (!paused) {
+        db.getTweets(nodeId, function (err, tweets) {
             if (err) {
-                log.error("Could not delete tweets: ", err);
+                log.error("Could not retrieve tweets: ", err);
+                return nextTweets();
             }
-            nextTweets();
+
+            var batchSize = tweets.length;
+            db.updateLoadOfVM(nodeId, batchSize, function(err) {
+                if (!err) {
+                    var now = new Date().getTime();
+                    var newStat = {
+                        created: now,
+                        batchSize: batchSize
+                    };
+                    db.storeStat(newStat, function(err) {
+                        if (err) {
+                            log.error("Error during writing stats to datastore: err =", err);
+                        }
+                    });
+                }
+                else {
+                    log.error("Error, something went wrong with updateLoadOfVM: err =", err);
+                }
+            });
+
+            if (tweets.length === 0) {
+                // Got no tweet to analyze - schedule next analysis in a few seconds.
+                // We back off a bit in order to not stress the database.
+                log.info('No more tweets. Schedule nextTweets in a few seconds');
+                setTimeout(nextTweets, BACK_OFF_DURATION_WHEN_EMPTY * 1000);
+                return;
+            }
+
+            tweets.forEach(function(t) {
+                analyzeTweet(t.data);
+                stats.tweetsCount += 1;
+            });
+
+            db.deleteTweets(tweets, function(err) {
+                if (err) {
+                    log.error("Could not delete tweets: ", err);
+                }
+                nextTweets();
+            });
         });
-    });
+    }
+    else {
+        setTimeout(nextTweets, BACK_OFF_DURATION_WHEN_PAUSED);
+    }
 }
 
 function analyzeTweet(tweet) {
