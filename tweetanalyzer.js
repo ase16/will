@@ -9,6 +9,12 @@ const config = require('config');
 const log = require('winston');
 log.level = config.get('log.level');
 
+
+let batchProcessing = config.get("batchProcessing");
+const BACK_OFF_DURATION_WHEN_EMPTY = batchProcessing.backOfDurationWhenEmpty;
+const READ_TERMS_INTERVAL = batchProcessing.readTermsInterval;
+const SAVE_ANALYSIS_INTERVAL = batchProcessing.saveAnalysisInterval;
+
 // maps terms to aggregated sentiment
 const termToSentiment = {};
 
@@ -241,30 +247,43 @@ function processTweets() {
            return nextTweets();
         }
 
-        db.updateLoadOfVM(nodeId, tweets.length, function(err) {
+        var batchSize = tweets.length;
+        db.updateLoadOfVM(nodeId, batchSize, function(err) {
+            if (!err) {
+                var now = new Date().getTime();
+                var newStat = {
+                    created: now,
+                    batchSize: batchSize
+                };
+                db.storeStat(newStat, function(err) {
+                    if (err) {
+                        log.error("Error during writing stats to datastore: err =", err);
+                    }
+                });
+            }
+            else {
+                log.error("Error, something went wrong with updateLoadOfVM: err =", err);
+            }
+        });
+
+        if (tweets.length === 0) {
+            // Got no tweet to analyze - schedule next analysis in a few seconds.
+            // We back off a bit in order to not stress the database.
+            log.info('No more tweets. Schedule nextTweets in a few seconds');
+            setTimeout(nextTweets, BACK_OFF_DURATION_WHEN_EMPTY * 1000);
+            return;
+        }
+
+        tweets.forEach(function(t) {
+            analyzeTweet(t.data);
+            stats.tweetsCount += 1;
+        });
+
+        db.deleteTweets(tweets, function(err) {
             if (err) {
-                log.error("Something went wrong with updateLoadOfVM. Err = ", err);
+                log.error("Could not delete tweets: ", err);
             }
-
-            if (tweets.length === 0) {
-                // got no tweet to analyze - schedule next analysis in a few seconds.
-                // we back off a bit in order to not stress the database.
-                log.info('No more tweets. Schedule nextTweets in a few seconds');
-                setTimeout(nextTweets, 10*1000);
-                return;
-            }
-
-            tweets.forEach(function(t) {
-                analyzeTweet(t.data);
-                stats.tweetsCount += 1;
-            });
-
-            db.deleteTweets(tweets, function(err) {
-                if (err) {
-                    log.error("Could not delete tweets: ", err);
-                }
-                nextTweets();
-            });
+            nextTweets();
         });
     });
 }
@@ -345,11 +364,11 @@ const tweetanalyzer = {
     init: function(dbModule, callback) {
         db = dbModule;
 
-        setInterval(updateTerms, 30*1000);
+        setInterval(updateTerms, READ_TERMS_INTERVAL * 1000);
 
-        setInterval(logStats, 10*1000);
+        setInterval(logStats, 10 * 1000);
 
-        setInterval(saveAggregatedSentiments, 30*1000);
+        setInterval(saveAggregatedSentiments, SAVE_ANALYSIS_INTERVAL * 1000);
 
         eventEmitter.on('nextTweets', processTweets);
 

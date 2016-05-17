@@ -3,6 +3,12 @@
         "projectId": "ase16-1255"
     },
 
+    "batchProcessing": {
+        "readTermsInterval": 30,
+        "saveAnalysisInterval": 30,
+        "backOfDurationWhenEmpty": 10
+    },
+
     "log": {
         "level": "info"
     }

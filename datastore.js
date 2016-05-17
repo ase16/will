@@ -103,6 +103,27 @@ const db = {
             }
         }
         callback(null);
+    },
+
+    storeStat: function(newStat, callback) {
+        if (!isConnected()) {
+            return callback("Datastore is not connected", null);
+        }
+
+        var key = datastore.key(['WillStat']);
+
+        datastore.save({
+            key: key,
+            data: {
+                created: newStat.created,
+                batchSize: newStat.batchSize
+            }
+        }, function(err) {
+            if (err) {
+                return callback(err);
+            }
+            return callback(null, key);
+        });
     }
 };
 
