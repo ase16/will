@@ -137,7 +137,8 @@ const db = {
             key: key,
             data: {
                 created: newStat.created,
-                batchSize: newStat.batchSize
+                batchSize: newStat.batchSize,
+                vmName: newStat.vmName
             }
         }, callback);
     }

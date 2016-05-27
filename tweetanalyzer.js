@@ -259,7 +259,8 @@ function processTweets() {
                     var now = new Date().getTime();
                     var newStat = {
                         created: now,
-                        batchSize: batchSize
+                        batchSize: batchSize,
+                        vmName: nodeId
                     };
                     db.storeStat(newStat, function(err) {
                         if (err) {
